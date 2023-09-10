@@ -20,5 +20,7 @@ public class CommentDto {
     private String authorName;
     private LocalDateTime created;
 
-    public CommentDto() {}
+    public CommentDto() {
+        
+    }
 }
