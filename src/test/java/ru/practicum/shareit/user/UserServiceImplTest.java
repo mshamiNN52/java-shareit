@@ -1,0 +1,181 @@
+package ru.practicum.shareit.user;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import ru.practicum.shareit.exception.UserNotFoundException;
+import ru.practicum.shareit.exception.ValidationException;
+import ru.practicum.shareit.user.dto.UserDto;
+import ru.practicum.shareit.user.mapper.UserMapper;
+import ru.practicum.shareit.user.model.User;
+import ru.practicum.shareit.user.repository.UserRepository;
+import ru.practicum.shareit.user.service.UserServiceImpl;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceImplTest {
+    private UserDto newUserDto;
+    private User userFromRepo;
+
+    @Mock
+    private UserRepository userRepo;
+    @InjectMocks
+    private UserServiceImpl userService;
+
+    @Captor
+    private ArgumentCaptor<User> userArgumentCaptor;
+
+    @BeforeEach
+    void setUp() {
+        newUserDto = UserDto.builder()
+                .email("hah@nu.ru")
+                .name("New User")
+                .build();
+
+        userFromRepo = User.builder()
+                .email("hah@nu.ru")
+                .name("New User")
+                .id(1L)
+                .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+    }
+
+    @Test
+    void testCreate_whenUserDtoCorrect_thenReturnDto() {
+        User newUser = UserMapper.makeUser(newUserDto).orElseThrow();
+        when(userRepo.save(newUser)).thenReturn(userFromRepo);
+        UserDto expectedDto = UserMapper.makeDto(userFromRepo).orElseThrow();
+        assertEquals(expectedDto, userService.addUser(newUserDto));
+    }
+
+    @Test
+    void testCreate_whenEmailIncorrect_thenThrowException() {
+        UserDto withIncorrectEmail = UserDto.builder()
+                .email("hah@ha")
+                .name("New User")
+                .build();
+        when(userRepo.save(UserMapper.makeUser(withIncorrectEmail).orElseThrow())).thenThrow(ValidationException.class);
+        assertThrows(ValidationException.class, () -> userService.addUser(withIncorrectEmail));
+    }
+
+    @Test
+    void testCreate_withoutName_thenThrowException() {
+        UserDto withIncorrectEmail = UserDto.builder()
+                .email("aaa@aa.nu")
+                .name("")
+                .build();
+        when(userRepo.save(UserMapper.makeUser(withIncorrectEmail).orElseThrow())).thenThrow(ValidationException.class);
+        assertThrows(ValidationException.class, () -> userService.addUser(withIncorrectEmail));
+
+    }
+
+    @Test
+    void testGetUser_whenIdIsCorrect_thenReturnDto() {
+        when(userRepo.findById(1L)).thenReturn(Optional.ofNullable(userFromRepo));
+        UserDto expectedDto = UserMapper.makeDto(userFromRepo).orElseThrow();
+        assertEquals(expectedDto, userService.getUser(1L));
+    }
+
+    @Test
+    void testGetUser_whenIdIsNotCorrect_thenThrowException() {
+        UserNotFoundException ex = assertThrows(UserNotFoundException.class, () -> userService.getUser(999L));
+        UserNotFoundException ex2 = assertThrows(UserNotFoundException.class, () -> userService.getUser(-999L));
+        ex.getMessage();
+        ex2.getMessage();
+    }
+
+    @Test
+    void testGetUsers_whenUserFound_returnListWithUserDto() {
+        UserDto fromRepo = newUserDto;
+        fromRepo.setId(1L);
+        List<User> expectedList = List.of(userFromRepo);
+        List<UserDto> expectedListDto = List.of(fromRepo);
+        when(userRepo.findAll()).thenReturn(expectedList);
+        assertEquals(expectedListDto, userService.getUsers());
+    }
+
+    @Test
+    void testGetUsers_whenUserNotFound_returnEmptyList() {
+        List<User> expectedList = List.of(new User());
+        List<UserDto> expectedListDto = List.of(new UserDto());
+        when(userRepo.findAll()).thenReturn(expectedList);
+        assertEquals(expectedListDto, userService.getUsers());
+    }
+
+    @Test
+    void testUpdate_whenCorrect_thenReturnUpdateDto() {
+        UserDto dtoUpdate = UserDto.builder()
+                .name("Update Name")
+                .email("bb@b.b")
+                .id(1L)
+                .build();
+
+        User userUpdate = User.builder()
+                .name("Update Name")
+                .email("bb@b.b")
+                .id(1L)
+                .build();
+
+        when(userRepo.findById(1L)).thenReturn(Optional.ofNullable(userFromRepo));
+        when(userRepo.save(userUpdate)).thenReturn(userUpdate);
+        assertEquals(dtoUpdate, userService.updateUser(dtoUpdate, 1L));
+
+        verify(userRepo).save(userArgumentCaptor.capture());
+        User savedUser = userArgumentCaptor.getValue();
+
+        assertEquals("Update Name", savedUser.getName());
+        assertEquals("bb@b.b", savedUser.getEmail());
+        assertEquals(1L, savedUser.getId());
+
+    }
+
+    @Test
+    void testUpdate_whenUpdateOnlyEmail_thenReturnUpdateDto() {
+        UserDto dtoUpdate = UserDto.builder()
+                .email("bb@b.b")
+                .id(1L)
+                .build();
+
+        User userUpdate = User.builder()
+                .name("New User")
+                .email("bb@b.b")
+                .id(1L)
+                .build();
+
+        UserDto expectedDto = dtoUpdate;
+        expectedDto.setName("New User");
+
+        when(userRepo.findById(1L)).thenReturn(Optional.ofNullable(userFromRepo));
+        when(userRepo.save(userUpdate)).thenReturn(userUpdate);
+        assertEquals(dtoUpdate, userService.updateUser(dtoUpdate, 1L));
+    }
+
+    @Test
+    void testDelete() {
+        when(userRepo.findById(1L)).thenReturn(Optional.ofNullable(userFromRepo));
+        userService.deleteUser(1L);
+        verify(userRepo).deleteById(1L);
+    }
+
+    @Test
+    void testClearAll() {
+        userService.clearAll();
+        verify(userRepo).deleteAll();
+    }
+}
