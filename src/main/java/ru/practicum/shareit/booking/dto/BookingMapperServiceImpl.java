@@ -108,7 +108,7 @@ public class BookingMapperServiceImpl implements BookingMapperService {
                 .collect(Collectors.toList());
     }
 
-    public List<Booking> prepareAnswerForState (Long bookerId, State state, PageRequest pageRequest) {
+    public List<Booking> prepareAnswerForState(Long bookerId, State state, PageRequest pageRequest) {
         switch (state) {
             case ALL:
                 return bookingRepo.findByBookerIdOrderByStartDesc(bookerId, pageRequest);
